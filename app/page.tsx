@@ -1,10 +1,9 @@
 // app/page.tsx
 import Header from '@/components/Header';
-import TalkCard from '@/components/TalkCard';
+import TalksClient from '@/components/TalksClient';
 import { supabase } from '@/lib/supabase';
 import { Talk } from '@/lib/types';
 
-// 서버 컴포넌트: 데이터 미리 가져오기
 async function getTalks(): Promise<Talk[]> {
   const { data, error } = await supabase
     .from('talks')
@@ -38,20 +37,8 @@ export default async function HomePage() {
           </p>
         </div>
 
-        {/* 토크 카드 그리드 */}
-        {talks.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {talks.map((talk) => (
-              <TalkCard key={talk.id} talk={talk} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <p className="text-gray-500 text-lg">
-              아직 토크 주제가 없습니다.
-            </p>
-          </div>
-        )}
+        {/* 클라이언트 컴포넌트 (필터 + 카드) */}
+        <TalksClient initialTalks={talks} />
       </main>
 
       {/* 푸터 */}
