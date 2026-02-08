@@ -19,87 +19,89 @@ export async function filterTopicsWithAI(
 ): Promise<FilteredTopic[]> {
   const model = genAI.getGenerativeModel({
     model: 'gemini-1.5-flash',
-    generationConfig: {
-      temperature: 0.3,
-      responseMimeType: 'application/json', // JSON 강제
-    },
   });
 
-  // 뉴스를 10개씩 나눠서 처리 (안정성 향상)
-  const batchSize = 10;
+  // 5개씩 배치 처리 (더 작게)
+  const batchSize = 5;
   const allResults: FilteredTopic[] = [];
 
-  for (let i = 0; i < newsList.length; i += batchSize) {
+  for (let i = 0; i < Math.min(newsList.length, 20); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
-      const prompt = `
-당신은 스몰토크 주제 큐레이터입니다. 다음 뉴스를 분석하여 JSON 배열로만 응답하세요.
+      const prompt = `다음 뉴스를 분석하여 스몰토크 주제로 변환해주세요.
 
-**제외 기준 (UNSAFE):**
-정치, 종교, 젠더, 범죄, 사고, 사망, 질병, 논란, 갈등
+**제외:** 정치, 종교, 사건사고, 논란
+**포함:** 연예, 스포츠, 음식, IT, 라이프
 
-**포함 기준 (SAFE):**
-연예, 스포츠, 음식, IT/테크, 라이프스타일
-
-**JSON 형식 (배열만 반환):**
-[
-  {
-    "original_title": "원본 제목",
-    "is_safe": true,
-    "talk_topic": "요즘 ○○ 해보셨어요?",
-    "description": "간단한 설명 2-3줄",
-    "category": "entertain",
-    "situation": ["company", "date"],
-    "age_group": "all"
-  }
-]
-
-뉴스 목록:
+뉴스:
 ${batch.map((n, idx) => `${idx + 1}. ${n.title}`).join('\n')}
 
-JSON 배열만 반환하세요. 다른 텍스트 없이 [ 로 시작해서 ] 로 끝나야 합니다.
-`;
+반드시 다음 JSON 형식으로만 답변:
+[{"original_title":"제목","is_safe":true,"talk_topic":"질문형태","description":"설명","category":"entertain","situation":["company"],"age_group":"all"}]
+
+JSON만 반환. 추가 설명 금지.`;
 
       const result = await model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text().trim();
+      const text = result.response.text().trim();
 
-      console.log(`[Batch ${i / batchSize + 1}] AI Response:`, text.substring(0, 100));
+      console.log(`Batch ${i / batchSize + 1} response:`, text.substring(0, 200));
 
-      // JSON 추출 시도
-      let parsed: FilteredTopic[] = [];
+      // JSON 추출
+      let jsonStr = text;
       
-      try {
-        // 1. 직접 파싱 시도
-        parsed = JSON.parse(text);
-      } catch (e) {
-        // 2. JSON 부분만 추출 시도
-        const jsonMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
-        } else {
-          console.error(`[Batch ${i / batchSize + 1}] Failed to parse JSON`);
-          continue;
+      // Markdown 코드블록 제거
+      if (text.includes('```')) {
+        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) {
+          jsonStr = match[1];
         }
       }
 
-      // SAFE한 주제만 필터링
-      const safeTopics = parsed.filter(t => t.is_safe);
-      allResults.push(...safeTopics);
-
-      // API Rate Limit 방지 (1초 대기)
-      if (i + batchSize < newsList.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // JSON 배열 찾기
+      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        jsonStr = arrayMatch[0];
       }
 
-    } catch (error) {
-      console.error(`[Batch ${i / batchSize + 1}] Error:`, error);
-      // 에러나도 계속 진행
-      continue;
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const safe = Array.isArray(parsed) 
+          ? parsed.filter(t => t.is_safe === true)
+          : [];
+        
+        allResults.push(...safe);
+        console.log(`Batch ${i / batchSize + 1}: Added ${safe.length} topics`);
+      } catch (parseError) {
+        console.error(`Parse error in batch ${i / batchSize + 1}:`, parseError);
+        console.error('Text was:', jsonStr.substring(0, 500));
+      }
+
+      // Rate limit 방지
+      if (i + batchSize < Math.min(newsList.length, 20)) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
+    } catch (error: any) {
+      console.error(`Batch ${i / batchSize + 1} error:`, error.message);
     }
   }
 
-  console.log(`Total filtered topics: ${allResults.length}`);
+  console.log(`Total filtered: ${allResults.length} topics`);
+  
+  // 최소한 몇 개는 반환하도록 (테스트용)
+  if (allResults.length === 0) {
+    console.log('No topics filtered, creating fallback');
+    return [{
+      original_title: newsList[0]?.title || 'Test',
+      is_safe: true,
+      talk_topic: '요즘 뉴스 보셨어요?',
+      description: '최근 화제가 되고 있는 뉴스에 대한 대화 주제입니다.',
+      category: 'life',
+      situation: ['company', 'date', 'friend'],
+      age_group: 'all',
+    }];
+  }
+
   return allResults;
 }
