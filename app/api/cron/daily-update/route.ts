@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { collectNaverNews } from '@/lib/newsCollector';
-import { filterTopicsWithAI } from '@/lib/aiFilter';
+import { filterTopicsWithAI, FilteredTopic } from '@/lib/aiFilter';
 
 export const maxDuration = 60;
 
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     console.log('🚀 [Daily Update] Started');
 
     // 1. 네이버 뉴스 수집
-    const news = await collectNaverNews(20); // 일단 20개만
+    const news = await collectNaverNews(20);
     console.log(`📰 Collected ${news.length} news`);
 
     if (news.length === 0) {
@@ -27,21 +27,22 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. AI 필터링
-    let filtered = [];
+    let filtered: FilteredTopic[] = [];
     try {
       filtered = await filterTopicsWithAI(news);
       console.log(`✅ Filtered ${filtered.length} topics`);
     } catch (aiError: any) {
       console.error('AI filtering failed:', aiError.message);
       
-      // AI 실패 시 수동 필터링 (임시)
+      // AI 실패 시 수동 필터링
       filtered = news.slice(0, 3).map(n => ({
         original_title: n.title,
         is_safe: true,
-        talk_topic: n.title.endsWith('?') ? n.title : `${n.title.substring(0, 30)}... 아세요?`,
+        talk_topic: n.title.length > 30 ? `${n.title.substring(0, 30)}... 아세요?` : n.title,
         description: n.description || '최근 화제가 되고 있는 뉴스입니다.',
+        conversation_tip: undefined,
         category: 'life' as const,
-        situation: ['company', 'friend'] as const,
+        situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
         age_group: 'all' as const,
       }));
       console.log(`⚠️ Used fallback: ${filtered.length} topics`);
