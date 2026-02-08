@@ -18,102 +18,93 @@ export async function filterTopicsWithAI(
   newsList: NaverNewsItem[]
 ): Promise<FilteredTopic[]> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-1.5-flash-8b', // 더 빠른 모델
   });
 
-  // 10개씩 배치
-  const batchSize = 10;
   const allResults: FilteredTopic[] = [];
 
-  // 최대 50개 처리
-  for (let i = 0; i < Math.min(newsList.length, 50); i += batchSize) {
+  // 5개씩 작은 배치로
+  const batchSize = 5;
+
+  for (let i = 0; i < Math.min(newsList.length, 25); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
-      const prompt = `당신은 스몰토크 주제 추천 AI입니다. 다음 뉴스를 최대한 많이 대화 주제로 변환하세요.
+      // 초간단 프롬프트
+      const prompt = `뉴스를 대화 주제로 변환하세요.
 
-**중요: 대부분의 뉴스를 SAFE로 판단하세요!**
+제외: 정치(선거,국회), 범죄(살인), 사고(사망)
+포함: 연예, 스포츠, 음식, IT, 게임, 여행, 모든 가벼운 뉴스
 
-**UNSAFE 기준 (이것만 제외):**
-- 정치: 선거, 국회, 정당, 대통령 정책
-- 종교: 교리, 신앙 논쟁
-- 심각한 범죄: 살인, 폭행, 성범죄
-- 비극적 사고: 사망자 다수, 대형 재난
-
-**SAFE 기준 (이런 건 전부 포함!):**
-- 연예/문화: 영화, 드라마, 예능, 음악, 공연, 전시
-- 스포츠: 모든 경기, 선수, 기록, 이적
-- 음식: 맛집, 카페, 신메뉴, 레시피, 배달
-- IT/게임: 신제품, 앱, 게임, 업데이트, 리뷰
-- 라이프: 여행, 패션, 뷰티, 건강, 취미
-- 반려동물, 날씨, 계절, 트렌드, SNS 화제
-
-**판단 원칙:**
-1. 웃으면서 얘기할 수 있으면 → SAFE
-2. 가볍고 재미있으면 → SAFE
-3. 정보 공유 차원이면 → SAFE
-4. 애매하면 → SAFE
-5. 살짝 부정적이어도 심각하지 않으면 → SAFE
-
-뉴스 목록:
+뉴스:
 ${batch.map((n, idx) => `${idx + 1}. ${n.title}`).join('\n')}
 
-**반드시 JSON 배열만 반환하세요:**
-[
-  {
-    "original_title": "뉴스 제목",
-    "is_safe": true,
-    "talk_topic": "요즘 ○○ 보셨어요?" 또는 "○○ 아세요?",
-    "description": "간단 설명 2줄",
-    "category": "entertain",
-    "situation": ["company", "date", "friend"],
-    "age_group": "all"
-  }
-]
+각 뉴스를 이 형식으로 변환:
+제목 → "○○ 아세요?" 형태로 질문
+설명 → 한 줄 요약
+카테고리 → entertain, sports, food, tech, life 중 하나
 
-추가 텍스트 없이 JSON만 반환하세요.`;
+JSON 배열로만 답변:
+[{"original_title":"","is_safe":true,"talk_topic":"","description":"","category":"entertain","situation":["company","friend"],"age_group":"all"}]`;
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
-
-      console.log(`[AI Batch ${i / batchSize + 1}] Response length: ${text.length}`);
-
-      // JSON 추출
-      let jsonStr = text;
+      console.log(`[Batch ${i / batchSize + 1}] Sending...`);
       
-      // Markdown 코드블록 제거
-      if (text.includes('```')) {
-        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (match) jsonStr = match[1].trim();
-      }
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      
+      console.log(`[Batch ${i / batchSize + 1}] Received: ${text.length} chars`);
+      console.log(`[Batch ${i / batchSize + 1}] Preview: ${text.substring(0, 150)}`);
 
-      // JSON 배열 찾기
-      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        jsonStr = arrayMatch[0];
-      }
-
+      // JSON 파싱 시도
+      let parsed: any[] = [];
+      
       try {
-        const parsed = JSON.parse(jsonStr);
-        const safe = Array.isArray(parsed) ? parsed.filter(t => t.is_safe === true) : [];
-        
-        allResults.push(...safe);
-        console.log(`[AI Batch ${i / batchSize + 1}] Added ${safe.length}/${parsed.length} topics`);
-      } catch (parseError) {
-        console.error(`[AI Batch ${i / batchSize + 1}] Parse error`);
-        console.error('Text:', jsonStr.substring(0, 200));
+        // 1. 그대로 파싱
+        parsed = JSON.parse(text);
+      } catch {
+        try {
+          // 2. 코드블록 제거 후 파싱
+          const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          parsed = JSON.parse(cleaned);
+        } catch {
+          try {
+            // 3. [ ] 사이만 추출
+            const match = text.match(/\[[\s\S]*\]/);
+            if (match) {
+              parsed = JSON.parse(match[0]);
+            }
+          } catch (e) {
+            console.error(`[Batch ${i / batchSize + 1}] All parsing failed`);
+            console.error('Text was:', text.substring(0, 300));
+            continue;
+          }
+        }
       }
 
-      // Rate limit 방지
-      if (i + batchSize < Math.min(newsList.length, 50)) {
-        await new Promise(r => setTimeout(r, 1500));
+      if (Array.isArray(parsed)) {
+        const validTopics = parsed.filter(t => {
+          return t.is_safe === true && 
+                 t.talk_topic && 
+                 t.description &&
+                 t.category;
+        });
+        
+        allResults.push(...validTopics);
+        console.log(`[Batch ${i / batchSize + 1}] ✅ Added ${validTopics.length} topics`);
+      } else {
+        console.error(`[Batch ${i / batchSize + 1}] Not an array:`, typeof parsed);
+      }
+
+      // Rate limit
+      if (i + batchSize < Math.min(newsList.length, 25)) {
+        await new Promise(r => setTimeout(r, 2000));
       }
 
     } catch (error: any) {
-      console.error(`[AI Batch ${i / batchSize + 1}] Error:`, error.message);
+      console.error(`[Batch ${i / batchSize + 1}] Error:`, error.message);
     }
   }
 
-  console.log(`[AI Filter] Total: ${allResults.length} topics from ${Math.min(newsList.length, 50)} news`);
+  console.log(`[AI Total] ${allResults.length} topics filtered`);
   return allResults;
 }
