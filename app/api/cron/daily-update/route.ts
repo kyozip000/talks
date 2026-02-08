@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     console.log('🚀 [Daily Update] Started');
 
     // 1. 네이버 뉴스 수집
-    const news = await collectNaverNews(20);
+    const news = await collectNaverNews(100);
     console.log(`📰 Collected ${news.length} news`);
 
     if (news.length === 0) {

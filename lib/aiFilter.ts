@@ -21,11 +21,12 @@ export async function filterTopicsWithAI(
     model: 'gemini-1.5-flash',
   });
 
-  // 5개씩 배치 처리 (더 작게)
-  const batchSize = 5;
+  // 10개씩 배치 처리 (5 → 10)
+  const batchSize = 10;
   const allResults: FilteredTopic[] = [];
 
-  for (let i = 0; i < Math.min(newsList.length, 20); i += batchSize) {
+  // 처리할 뉴스 개수 늘리기 (20 → 50)
+  for (let i = 0; i < Math.min(newsList.length, 50); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
