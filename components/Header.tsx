@@ -1,20 +1,17 @@
-// components/Header.tsx
 export default function Header() {
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          {/* 로고 */}
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🗣️</span>
-            <h1 className="text-2xl font-bold text-gray-900">토크스</h1>
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm">
+      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center">
+            <span className="text-white text-lg font-bold">T</span>
           </div>
-          
-          {/* 태그라인 */}
-          <p className="hidden md:block text-sm text-gray-600">
-            어색한 순간, 가벼운 화제
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">토크스</h1>
         </div>
+        
+        <p className="text-sm text-gray-500 hidden sm:block">
+          가벼운 대화 주제
+        </p>
       </div>
     </header>
   );
