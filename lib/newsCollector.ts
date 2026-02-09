@@ -7,104 +7,98 @@ export interface NaverNewsItem {
 }
 
 export async function collectNaverNews(count: number = 100): Promise<NaverNewsItem[]> {
-  // 트렌디하고 다양한 검색어 60개!
+  // 범용 키워드 (카테고리 구분 없이 다양하게!)
   const searchQueries = [
-    // 🎬 연예/엔터 (10개)
-    '트렌드',
-    '개봉',
+    // 트렌드/화제
+    '요즘',
+    '화제',
+    '인기',
+    '뜨는',
+    '유행',
+    '핫한',
+    '대박',
+    '신기록',
+    '최고',
+    '역대급',
+    '신상',
+    '출시',
+    
+    // 연예/문화
+    '영화',
     '드라마',
     '예능',
-    '아이돌',
-    '차트',
-    '넷플릭스',
-    '신작',
+    '음악',
+    '공연',
+    '전시',
+    '신곡',
+    '컴백',
+    '데뷔',
     '1위',
-    '유튜브',
-    '인기',
     
-    // ⚽ 스포츠 (8개)
-    '트렌드',
-    '인기',
-    '최신',
-    '트렌디',
-    '상륙',
-    '1위',
+    // 스포츠
+    '승리',
     '우승',
     '경기',
-    '행보',
+    '득점',
+    '기록',
+    '시즌',
+    '결승',
+    '메달',
     
-    // 🍔 음식/맛집 (10개)
+    // 음식
     '맛집',
-    '신상',
-    '유행',
-    '신메뉴',
     '카페',
-    '스타벅스',
+    '신메뉴',
+    '디저트',
+    '레시피',
+    '베이커리',
+    '편의점',
     '배달',
-    '요즘',
-    '팝업스토어',
-    '미슐랭',
     
-    // 📱 IT/테크/게임 (12개)
-    '아이폰',
-    '갤럭시',
-    '애플',
-    '삼성',
-    '게임',
-    '신상',
-    '이벤트',
-    'AI',
+    // IT/테크
+    '출시',
+    '신제품',
+    '업데이트',
     '앱',
-    '유행',
-    '인스타',
-    '틱톡',
-    '트렌드',
+    '게임',
+    '기능',
+    '스마트폰',
+    '인공지능',
     
-    // 🎨 라이프스타일/트렌드 (20개)
-    '트렌드',
-    'MZ',
-    'Z세대',
-    '요즘',
-    '인스타',
-    'SNS',
-    '밈',
-    '숏폼',
-    '버킷리스트',
-    '반려동물',
-    '강아지',
-    '고양이',
-    '러닝',
-    '홈카페',
-    '홈트레이닝',
-    '필라테스',
-    '요가',
-    '캠핑',
-    '차박',
-    '등산',
-    '사진',
-    
-    // 🛍️ 패션/뷰티 (5개)
-    '트렌드',
-    '무신사',
-    '올리브영',
+    // 라이프
+    '여행',
     '패션',
-    '스트릿',
     '뷰티',
+    '건강',
+    '취미',
+    '반려동물',
+    '인테리어',
+    '꿀팁',
     
-    // ✈️ 여행 (5개)
+    // 추가 범용
+    '추천',
+    '핫한',
+    '유행',
+    '붐',
+    'mz',
     '트렌드',
-    '국내',
-    '제주도',
-    '부산',
-    '서울',
-    '주말',
+    '신규',
+    '베스트',
+    '오픈',
+    '론칭',
+    '화제작',
+    '시즌',
+    '이벤트',
+    '축제',
+    '체험',
+    '방문',
   ];
 
   const allNews: NaverNewsItem[] = [];
   const seenTitles = new Set<string>();
 
-  // 각 검색어당 2-3개씩
-  const itemsPerQuery = Math.max(2, Math.ceil(count / searchQueries.length));
+  // 각 키워드당 2-3개씩
+  const itemsPerQuery = 3;
 
   for (const query of searchQueries) {
     try {
@@ -124,7 +118,7 @@ export async function collectNaverNews(count: number = 100): Promise<NaverNewsIt
       });
 
       if (!response.ok) {
-        console.error(`[${query}] API error: ${response.status}`);
+        console.error(`[${query}] ${response.status}`);
         continue;
       }
 
@@ -137,16 +131,16 @@ export async function collectNaverNews(count: number = 100): Promise<NaverNewsIt
           const cleanTitle = removeHtmlTags(item.title);
           const cleanDesc = removeHtmlTags(item.description);
           
-          // 필터링: 너무 짧거나 중복이면 스킵
-          if (cleanTitle.length < 10 || seenTitles.has(cleanTitle)) {
+          // 너무 짧거나 중복이면 스킵
+          if (cleanTitle.length < 15 || seenTitles.has(cleanTitle)) {
             continue;
           }
           
-          // 너무 비슷한 제목도 스킵
-          const titleWords = cleanTitle.split(' ').slice(0, 3).join(' ');
+          // 비슷한 제목 체크
           let isDuplicate = false;
           for (const existing of seenTitles) {
-            if (existing.includes(titleWords) || titleWords.includes(existing.split(' ').slice(0, 3).join(' '))) {
+            const similarity = calculateSimilarity(cleanTitle, existing);
+            if (similarity > 0.7) { // 70% 이상 유사하면 중복
               isDuplicate = true;
               break;
             }
@@ -168,15 +162,15 @@ export async function collectNaverNews(count: number = 100): Promise<NaverNewsIt
         }
       }
 
-      // Rate limit 방지
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // API Rate Limit 방지
+      await new Promise(resolve => setTimeout(resolve, 150));
 
     } catch (error) {
-      console.error(`[${query}] Error:`, error);
+      console.error(`[${query}] Error`);
     }
   }
 
-  console.log(`📊 Total collected: ${allNews.length} unique news`);
+  console.log(`📊 Total: ${allNews.length} unique news`);
 
   // 날짜순 정렬
   allNews.sort((a, b) => 
@@ -194,4 +188,17 @@ function removeHtmlTags(text: string): string {
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
+}
+
+// 문자열 유사도 계산 (간단 버전)
+function calculateSimilarity(str1: string, str2: string): number {
+  const words1 = str1.split(' ');
+  const words2 = str2.split(' ');
+  
+  let matchCount = 0;
+  words1.forEach(word => {
+    if (words2.includes(word)) matchCount++;
+  });
+  
+  return matchCount / Math.max(words1.length, words2.length);
 }
