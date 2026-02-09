@@ -24,41 +24,32 @@ export async function filterTopicsWithAI(
   const allResults: FilteredTopic[] = [];
   const batchSize = 5;
 
-  // 카테고리별로 뉴스 분배
-  const categoryTargets = {
-    entertain: Math.ceil(newsList.length * 0.25), // 25%
-    sports: Math.ceil(newsList.length * 0.20),    // 20%
-    food: Math.ceil(newsList.length * 0.20),      // 20%
-    tech: Math.ceil(newsList.length * 0.20),      // 20%
-    life: Math.ceil(newsList.length * 0.15),      // 15%
-  };
-
   for (let i = 0; i < Math.min(newsList.length, 50); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
-      const prompt = `뉴스를 대화 주제로 변환하세요.
+      const prompt = `뉴스를 간결한 대화 주제로 변환하세요.
 
 **제외:** 정치(선거,국회), 범죄(살인), 사고(사망)
 
-**카테고리 분류 (정확히!):**
-- entertain: 영화, 드라마, 예능, 음악, 아이돌, 연예인
-- sports: 축구, 야구, 농구, 올림픽, 스포츠 경기
-- food: 맛집, 카페, 레시피, 음식, 디저트, 편의점
-- tech: 스마트폰, 앱, 게임, IT, 신제품, 가젯
-- life: 여행, 패션, 건강, 취미, 반려동물, 날씨
+**카테고리:**
+- entertain: 영화, 드라마, 예능, 음악, 연예인
+- sports: 축구, 야구, 농구, 스포츠
+- food: 맛집, 카페, 음식, 디저트
+- tech: 스마트폰, 앱, 게임, IT
+- life: 여행, 패션, 건강, 반려동물
 
 **중요 규칙:**
-1. talk_topic: 주제나 제목을 요약해서 작성 핵심 키워드 포함 1줄로만, 문장 중간에 자르지 말 것
-2. description: 핵심만 1-2문장으로 요약. 숫자나 구체적 정보 포함. 문장 중간에 자르지 말 것
-3. category: 위 5개 중 가장 정확한 것 선택
-4. 애매하면 SAFE로 판단
+1. talk_topic: 간결하고 자연스러운 제목만! "~~ 아세요?", "~~ 보셨어요?" 같은 질문형 금지!
+   예시: "영화 왕사남", "손흥민 해트트릭", "GS25 신상 디저트"
+2. description: 핵심만 1-2문장, 숫자/구체적 정보 포함
+3. 애매하면 SAFE
 
 뉴스:
 ${batch.map((n, idx) => `${idx + 1}. ${n.title}`).join('\n')}
 
 JSON만 반환:
-[{"original_title":"","is_safe":true,"talk_topic":"영화 왕사남 보셨어요?","description":"개봉 5일 만에 100만 관객 돌파한 화제작","category":"entertain","situation":["company","friend"],"age_group":"all"}]`;
+[{"original_title":"","is_safe":true,"talk_topic":"영화 왕사남","description":"개봉 5일 만에 100만 관객 돌파","category":"entertain","situation":["company","friend"],"age_group":"all"}]`;
 
       const result = await model.generateContent(prompt);
       const text = result.response.text().trim();
@@ -92,23 +83,5 @@ JSON만 반환:
   }
 
   console.log(`[AI Total] ${allResults.length} topics`);
-  
-  // 카테고리 분포 확인
-  const categoryCount: Record<string, number> = {
-    entertain: 0,
-    sports: 0,
-    food: 0,
-    tech: 0,
-    life: 0,
-  };
-  
-  allResults.forEach(t => {
-    if (categoryCount[t.category] !== undefined) {
-      categoryCount[t.category]++;
-    }
-  });
-  
-  console.log('[AI Categories]', categoryCount);
-
   return allResults;
 }
