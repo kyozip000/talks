@@ -3,49 +3,38 @@
 import { useState, useMemo } from 'react';
 import { Talk } from '@/lib/types';
 import TalkCard from './TalkCard';
-import FilterBar from './FilterBar';
+import KeywordCloud from './KeywordCloud';
+import { extractKeywords } from '@/lib/keywordExtractor';
 
 interface TalksClientProps {
   initialTalks: Talk[];
 }
 
 export default function TalksClient({ initialTalks }: TalksClientProps) {
-  const [selectedSituation, setSelectedSituation] = useState('all');
-  const [selectedAgeGroup, setSelectedAgeGroup] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
 
-  // 필터링된 토크 주제
+  // 키워드 추출
+  const keywords = useMemo(() => {
+    return extractKeywords(initialTalks);
+  }, [initialTalks]);
+
+  // 키워드 필터링
   const filteredTalks = useMemo(() => {
-    return initialTalks.filter((talk) => {
-      // 상황 필터
-      const situationMatch =
-        selectedSituation === 'all' ||
-        talk.situation.includes(selectedSituation as any);
+    if (!selectedKeyword) return initialTalks;
 
-      // 연령대 필터
-      const ageGroupMatch =
-        selectedAgeGroup === 'all' ||
-        talk.age_group === selectedAgeGroup ||
-        talk.age_group === 'all';
-
-      // 카테고리 필터
-      const categoryMatch =
-        selectedCategory === 'all' || talk.category === selectedCategory;
-
-      return situationMatch && ageGroupMatch && categoryMatch;
+    return initialTalks.filter(talk => {
+      const text = `${talk.talk_topic} ${talk.description}`;
+      return text.includes(selectedKeyword);
     });
-  }, [initialTalks, selectedSituation, selectedAgeGroup, selectedCategory]);
+  }, [initialTalks, selectedKeyword]);
 
   return (
     <>
-      {/* 필터 바 */}
-      <FilterBar
-        selectedSituation={selectedSituation}
-        selectedAgeGroup={selectedAgeGroup}
-        selectedCategory={selectedCategory}
-        onSituationChange={setSelectedSituation}
-        onAgeGroupChange={setSelectedAgeGroup}
-        onCategoryChange={setSelectedCategory}
+      {/* 키워드 클라우드 */}
+      <KeywordCloud 
+        keywords={keywords}
+        selectedKeyword={selectedKeyword}
+        onKeywordSelect={setSelectedKeyword}
       />
 
       {/* 결과 개수 */}
@@ -66,10 +55,10 @@ export default function TalksClient({ initialTalks }: TalksClientProps) {
         <div className="text-center py-20 bg-white rounded-xl">
           <p className="text-gray-500 text-lg mb-2">😢</p>
           <p className="text-gray-500 text-lg">
-            해당 조건의 대화 주제가 없습니다.
+            "{selectedKeyword}" 관련 주제가 없습니다.
           </p>
           <p className="text-gray-400 text-sm mt-2">
-            다른 필터를 선택해보세요!
+            다른 키워드를 선택해보세요!
           </p>
         </div>
       )}
