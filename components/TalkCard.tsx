@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -11,54 +11,9 @@ interface TalkCardProps {
   talk: Talk;
 }
 
-const categoryConfig = {
-  entertain: {
-    label: '요즘 핫한',
-    emoji: '🎬',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
-    textColor: 'text-purple-700',
-    accentColor: 'bg-purple-600',
-  },
-  sports: {
-    label: '스포츠',
-    emoji: '⚽',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    textColor: 'text-green-700',
-    accentColor: 'bg-green-600',
-  },
-  food: {
-    label: '맛집/음식',
-    emoji: '🍔',
-    bgColor: 'bg-orange-50',
-    borderColor: 'border-orange-200',
-    textColor: 'text-orange-700',
-    accentColor: 'bg-orange-600',
-  },
-  tech: {
-    label: '테크/가젯',
-    emoji: '📱',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    textColor: 'text-blue-700',
-    accentColor: 'bg-blue-600',
-  },
-  life: {
-    label: '일상 공감',
-    emoji: '☕',
-    bgColor: 'bg-pink-50',
-    borderColor: 'border-pink-200',
-    textColor: 'text-pink-700',
-    accentColor: 'bg-pink-600',
-  },
-};
-
 export default function TalkCard({ talk }: TalkCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
-
-  const config = categoryConfig[talk.category as keyof typeof categoryConfig] || categoryConfig.life;
 
   useEffect(() => {
     if (isFlipped && !hasViewed) {
@@ -88,27 +43,17 @@ export default function TalkCard({ talk }: TalkCardProps) {
         >
           {/* 앞면 */}
           <div
-            className={`absolute w-full h-full ${config.bgColor} rounded-2xl border ${config.borderColor} p-6 flex flex-col justify-between hover:border-opacity-80 transition-all`}
+            className="absolute w-full h-full bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-gray-200 p-6 flex flex-col justify-center hover:border-gray-300 transition-all"
             style={{ backfaceVisibility: 'hidden' }}
           >
-            {/* 상단 - 카테고리 뱃지 */}
-            <div>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${config.textColor} border ${config.borderColor}`}>
-                <span className="text-base">{config.emoji}</span>
-                {config.label}
-              </span>
-            </div>
-
-            {/* 중앙 - 토크 주제 */}
             <div className="flex-1 flex items-center justify-center px-4">
               <h3 className="text-lg font-bold text-gray-900 text-center leading-relaxed">
                 {talk.talk_topic}
               </h3>
             </div>
 
-            {/* 하단 - 안내 */}
             <div className="text-center">
-              <div className={`inline-block px-3 py-1 rounded-full ${config.accentColor} text-white text-xs font-medium`}>
+              <div className="inline-block px-4 py-1.5 rounded-full bg-indigo-600 text-white text-xs font-medium">
                 탭하여 자세히 보기 →
               </div>
             </div>
@@ -123,20 +68,10 @@ export default function TalkCard({ talk }: TalkCardProps) {
             }}
           >
             <div className="flex-1 overflow-y-auto">
-              {/* 카테고리 뱃지 */}
-              <div className="mb-4">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${config.bgColor} ${config.textColor} border ${config.borderColor}`}>
-                  <span className="text-base">{config.emoji}</span>
-                  {config.label}
-                </span>
-              </div>
-
-              {/* 토크 주제 */}
               <h3 className="text-base font-bold text-gray-900 mb-4">
                 {talk.talk_topic}
               </h3>
 
-              {/* 설명 */}
               <div className="space-y-3 mb-4">
                 <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 mb-1.5">📝 배경 설명</p>
@@ -155,14 +90,12 @@ export default function TalkCard({ talk }: TalkCardProps) {
                 )}
               </div>
 
-              {/* 조회수 */}
               <div className="flex items-center gap-1.5 text-xs text-gray-400">
                 <Eye size={12} />
                 <span>{talk.view_count || 0}회 조회</span>
               </div>
             </div>
 
-            {/* 하단 - 액션 버튼들 */}
             <div className="mt-4 pt-4 border-t border-gray-100">
               <div className="flex gap-2 mb-3">
                 <LikeButton talkId={talk.id} initialLikes={talk.like_count || 0} />
