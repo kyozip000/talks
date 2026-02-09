@@ -10,26 +10,26 @@ interface FilterBarProps {
 }
 
 const situations = [
-  { value: 'all', label: '전체', icon: '🌐' },
-  { value: 'company', label: '회사', icon: '🏢' },
-  { value: 'date', label: '소개팅', icon: '💑' },
-  { value: 'friend', label: '친구', icon: '👥' },
+  { value: 'all', label: '전체' },
+  { value: 'company', label: '회사' },
+  { value: 'date', label: '소개팅' },
+  { value: 'friend', label: '친구' },
 ];
 
 const ageGroups = [
-  { value: 'all', label: '전체', icon: '🌐' },
-  { value: '20s', label: '20대', icon: '👶' },
-  { value: '30s', label: '30대', icon: '👔' },
-  { value: '40s', label: '40대', icon: '👨‍💼' },
+  { value: 'all', label: '전체' },
+  { value: '20s', label: '20대' },
+  { value: '30s', label: '30대' },
+  { value: '40s', label: '40대' },
 ];
 
 const categories = [
-  { value: 'all', label: '전체', icon: '🌐' },
-  { value: 'entertain', label: '요즘 핫한', icon: '🎬' },
-  { value: 'sports', label: '스포츠', icon: '⚽' },
-  { value: 'food', label: '맛집/음식', icon: '🍔' },
-  { value: 'tech', label: '테크', icon: '📱' },
-  { value: 'life', label: '일상', icon: '☕' },
+  { value: 'all', label: '전체' },
+  { value: 'entertain', label: '요즘 핫한' },
+  { value: 'sports', label: '스포츠' },
+  { value: 'food', label: '맛집' },
+  { value: 'tech', label: '테크' },
+  { value: 'life', label: '일상' },
 ];
 
 export default function FilterBar({
@@ -41,67 +41,66 @@ export default function FilterBar({
   onCategoryChange,
 }: FilterBarProps) {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-      {/* 상황별 필터 */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">📍 상황</h3>
-        <div className="flex flex-wrap gap-2">
-          {situations.map((situation) => (
-            <button
-              key={situation.value}
-              onClick={() => onSituationChange(situation.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedSituation === situation.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="mr-1">{situation.icon}</span>
-              {situation.label}
-            </button>
-          ))}
+    <div className="sticky top-16 z-40 bg-white border-b border-gray-200">
+      <div className="max-w-6xl mx-auto px-4 py-4">
+        {/* 상황 */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-700 mb-2">상황</p>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {situations.map((situation) => (
+              <button
+                key={situation.value}
+                onClick={() => onSituationChange(situation.value)}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                  selectedSituation === situation.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {situation.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 연령대별 필터 */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">👥 연령대</h3>
-        <div className="flex flex-wrap gap-2">
-          {ageGroups.map((age) => (
-            <button
-              key={age.value}
-              onClick={() => onAgeGroupChange(age.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedAgeGroup === age.value
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="mr-1">{age.icon}</span>
-              {age.label}
-            </button>
-          ))}
+        {/* 연령대 */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-700 mb-2">연령대</p>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {ageGroups.map((age) => (
+              <button
+                key={age.value}
+                onClick={() => onAgeGroupChange(age.value)}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                  selectedAgeGroup === age.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {age.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 카테고리별 필터 */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">🏷️ 카테고리</h3>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
-            <button
-              key={category.value}
-              onClick={() => onCategoryChange(category.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedCategory === category.value
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="mr-1">{category.icon}</span>
-              {category.label}
-            </button>
-          ))}
+        {/* 카테고리 */}
+        <div>
+          <p className="text-xs font-semibold text-gray-700 mb-2">카테고리</p>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {categories.map((category) => (
+              <button
+                key={category.value}
+                onClick={() => onCategoryChange(category.value)}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                  selectedCategory === category.value
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
