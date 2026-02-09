@@ -49,7 +49,7 @@ export async function filterTopicsWithAI(
 - life: 여행, 패션, 건강, 취미, 반려동물, 날씨
 
 **중요 규칙:**
-1. talk_topic: "~~ 아세요?" 또는 "~~ 보셨어요?" 형태로, ...으로 자르지 말고 완전한 문장으로
+1. talk_topic: 주제나 제목을 요약해서 작성 핵심 키워드 포함 1줄로만, 문장 중간에 자르지 말 것
 2. description: 핵심만 1-2문장으로 요약. 숫자나 구체적 정보 포함. 문장 중간에 자르지 말 것
 3. category: 위 5개 중 가장 정확한 것 선택
 4. 애매하면 SAFE로 판단
