@@ -4,50 +4,27 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  // 1. 직접 변수 확인 (이걸로 Vercel 로그에서 주소 대조 가능)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY!; // 마스터키 사용
+
+  // 2. 마스터키를 사용하는 클라이언트 생성
+  const supabase = createClient(supabaseUrl, serviceKey);
+
   try {
-    // 환경변수 확인
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    console.log('Supabase URL:', supabaseUrl);
-    console.log('Supabase Key exists:', !!supabaseKey);
-
-    if (!supabaseUrl || !supabaseKey) {
-      return NextResponse.json({
-        error: 'Missing environment variables',
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey,
-      });
-    }
-
-    // 직접 클라이언트 생성
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 데이터 조회
     const { data, error, count } = await supabase
       .from('talks')
-      .select('*', { count: 'exact' })
-      .limit(5);
+      .select('*', { count: 'exact' });
 
     return NextResponse.json({
       success: !error,
-      environment: {
-        hasUrl: !!supabaseUrl,
-        hasKey: !!supabaseKey,
-        urlPreview: supabaseUrl?.substring(0, 30) + '...',
-      },
-      query: {
-        error: error?.message,
-        count: count,
-        dataLength: data?.length,
-        data: data,
-      },
+      // 🧐 여기서 URL이 님 프로젝트 주소와 일치하는지 꼭 보세요!
+      projectUrl: supabaseUrl, 
+      count: count,
+      data: data,
+      error: error ? error.message : null
     });
-
-  } catch (error: any) {
-    return NextResponse.json({
-      error: error.message,
-      stack: error.stack,
-    });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message });
   }
 }
