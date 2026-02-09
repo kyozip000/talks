@@ -17,125 +17,98 @@ export interface FilteredTopic {
 export async function filterTopicsWithAI(
   newsList: NaverNewsItem[]
 ): Promise<FilteredTopic[]> {
-  
-  // 매우 짧고 명확한 프롬프트
   const model = genAI.getGenerativeModel({
     model: 'gemini-1.5-flash',
   });
 
   const allResults: FilteredTopic[] = [];
+  const batchSize = 5;
 
-  // 한 번에 3개씩만 처리 (안정성 최우선)
-  const batchSize = 3;
+  // 카테고리별로 뉴스 분배
+  const categoryTargets = {
+    entertain: Math.ceil(newsList.length * 0.25), // 25%
+    sports: Math.ceil(newsList.length * 0.20),    // 20%
+    food: Math.ceil(newsList.length * 0.20),      // 20%
+    tech: Math.ceil(newsList.length * 0.20),      // 20%
+    life: Math.ceil(newsList.length * 0.15),      // 15%
+  };
 
-  for (let i = 0; i < Math.min(newsList.length, 30); i += batchSize) {
+  for (let i = 0; i < Math.min(newsList.length, 50); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
-      // 극도로 단순화된 프롬프트
-      const newsText = batch.map((n, idx) => 
-        `${idx + 1}. ${n.title}`
-      ).join('\n');
+      const prompt = `뉴스를 대화 주제로 변환하세요.
 
-      const prompt = `다음 뉴스를 대화 주제로 만들어줘.
+**제외:** 정치(선거,국회), 범죄(살인), 사고(사망)
+
+**카테고리 분류 (정확히!):**
+- entertain: 영화, 드라마, 예능, 음악, 아이돌, 연예인
+- sports: 축구, 야구, 농구, 올림픽, 스포츠 경기
+- food: 맛집, 카페, 레시피, 음식, 디저트, 편의점
+- tech: 스마트폰, 앱, 게임, IT, 신제품, 가젯
+- life: 여행, 패션, 건강, 취미, 반려동물, 날씨
+
+**중요 규칙:**
+1. talk_topic: "~~ 아세요?" 또는 "~~ 보셨어요?" 형태로, 완전한 문장으로
+2. description: 핵심만 1-2문장으로 요약. 숫자나 구체적 정보 포함. 문장 중간에 자르지 말 것
+3. category: 위 5개 중 가장 정확한 것 선택
+4. 애매하면 SAFE로 판단
 
 뉴스:
-${newsText}
+${batch.map((n, idx) => `${idx + 1}. ${n.title}`).join('\n')}
 
-규칙:
-- 정치, 범죄, 사고만 제외
-- 나머지는 전부 포함
-- 각 뉴스마다 질문 형태로 변환
-
-예시:
-입력: "아이폰 17 출시"
-출력: {"is_safe":true,"talk_topic":"아이폰 17 나왔다는데 아세요?","description":"애플 신제품 출시","category":"tech"}
-
-이제 위 뉴스들을 JSON 배열로:
-[{"is_safe":true,"talk_topic":"...","description":"...","category":"entertain"}]`;
+JSON만 반환:
+[{"original_title":"","is_safe":true,"talk_topic":"영화 왕사남 보셨어요?","description":"개봉 5일 만에 100만 관객 돌파한 화제작","category":"entertain","situation":["company","friend"],"age_group":"all"}]`;
 
       const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      
-      console.log(`[AI ${i / batchSize + 1}/${Math.ceil(Math.min(newsList.length, 30) / batchSize)}] Raw response:`, text.substring(0, 100));
+      const text = result.response.text().trim();
 
-      // JSON 추출
-      let jsonStr = text.trim();
-      
-      // 모든 마크다운 제거
-      jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-      
-      // [ ] 찾기
-      const match = jsonStr.match(/\[[\s\S]*\]/);
-      if (match) {
-        jsonStr = match[0];
+      let jsonStr = text;
+      if (text.includes('```')) {
+        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) jsonStr = match[1].trim();
       }
+
+      const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+      if (arrayMatch) jsonStr = arrayMatch[0];
 
       try {
         const parsed = JSON.parse(jsonStr);
+        const safe = Array.isArray(parsed) ? parsed.filter(t => t.is_safe === true) : [];
         
-        if (Array.isArray(parsed)) {
-          // 각 항목 보완
-          const topics = parsed
-            .filter(t => t.is_safe === true)
-            .map((t, idx) => ({
-              original_title: batch[idx]?.title || t.talk_topic,
-              is_safe: true,
-              talk_topic: t.talk_topic || batch[idx]?.title,
-              description: t.description || batch[idx]?.description?.substring(0, 100) || '최근 화제',
-              conversation_tip: undefined,
-              category: t.category || 'life',
-              situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
-              age_group: 'all' as const,
-            }));
-          
-          allResults.push(...topics);
-          console.log(`[AI ${i / batchSize + 1}] ✅ ${topics.length}개 추가`);
-        }
+        allResults.push(...safe);
+        console.log(`[AI Batch ${i / batchSize + 1}] +${safe.length} topics`);
       } catch (parseError) {
-        console.error(`[AI ${i / batchSize + 1}] ❌ Parse failed`);
-        
-        // 파싱 실패 시 수동 변환
-        const manual = batch.map(n => ({
-          original_title: n.title,
-          is_safe: true,
-          talk_topic: `${n.title.substring(0, 30)}... 아세요?`,
-          description: n.description.substring(0, 100),
-          conversation_tip: undefined,
-          category: 'life' as const,
-          situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
-          age_group: 'all' as const,
-        }));
-        
-        allResults.push(...manual);
-        console.log(`[AI ${i / batchSize + 1}] ⚠️ Fallback: ${manual.length}개`);
+        console.error(`[AI Batch ${i / batchSize + 1}] Parse error`);
       }
 
-      // Rate limit
-      if (i + batchSize < Math.min(newsList.length, 30)) {
+      if (i + batchSize < Math.min(newsList.length, 50)) {
         await new Promise(r => setTimeout(r, 1500));
       }
 
     } catch (error: any) {
-      console.error(`[AI ${i / batchSize + 1}] Error:`, error.message);
-      
-      // 에러 시에도 수동 변환
-      const manual = batch.map(n => ({
-        original_title: n.title,
-        is_safe: true,
-        talk_topic: `${n.title.substring(0, 30)}... 아세요?`,
-        description: n.description.substring(0, 100),
-        conversation_tip: undefined,
-        category: 'life' as const,
-        situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
-        age_group: 'all' as const,
-      }));
-      
-      allResults.push(...manual);
-      console.log(`[AI ${i / batchSize + 1}] 🔧 Error fallback: ${manual.length}개`);
+      console.error(`[AI Batch ${i / batchSize + 1}] Error:`, error.message);
     }
   }
 
-  console.log(`[AI Total] ${allResults.length}개 필터링 완료`);
+  console.log(`[AI Total] ${allResults.length} topics`);
+  
+  // 카테고리 분포 확인
+  const categoryCount: Record<string, number> = {
+    entertain: 0,
+    sports: 0,
+    food: 0,
+    tech: 0,
+    life: 0,
+  };
+  
+  allResults.forEach(t => {
+    if (categoryCount[t.category] !== undefined) {
+      categoryCount[t.category]++;
+    }
+  });
+  
+  console.log('[AI Categories]', categoryCount);
+
   return allResults;
 }
