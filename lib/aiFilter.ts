@@ -17,94 +17,125 @@ export interface FilteredTopic {
 export async function filterTopicsWithAI(
   newsList: NaverNewsItem[]
 ): Promise<FilteredTopic[]> {
+  
+  // 매우 짧고 명확한 프롬프트
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash-8b', // 더 빠른 모델
+    model: 'gemini-1.5-flash',
   });
 
   const allResults: FilteredTopic[] = [];
 
-  // 5개씩 작은 배치로
-  const batchSize = 5;
+  // 한 번에 3개씩만 처리 (안정성 최우선)
+  const batchSize = 3;
 
-  for (let i = 0; i < Math.min(newsList.length, 25); i += batchSize) {
+  for (let i = 0; i < Math.min(newsList.length, 30); i += batchSize) {
     const batch = newsList.slice(i, i + batchSize);
     
     try {
-      // 초간단 프롬프트
-      const prompt = `뉴스를 대화 주제로 변환하세요.
+      // 극도로 단순화된 프롬프트
+      const newsText = batch.map((n, idx) => 
+        `${idx + 1}. ${n.title}`
+      ).join('\n');
 
-제외: 정치(선거,국회), 범죄(살인), 사고(사망)
-포함: 연예, 스포츠, 음식, IT, 게임, 여행, 모든 가벼운 뉴스
+      const prompt = `다음 뉴스를 대화 주제로 만들어줘.
 
 뉴스:
-${batch.map((n, idx) => `${idx + 1}. ${n.title}`).join('\n')}
+${newsText}
 
-각 뉴스를 이 형식으로 변환:
-제목 → "○○ 아세요?" 형태로 질문
-설명 → 한 줄 요약
-카테고리 → entertain, sports, food, tech, life 중 하나
+규칙:
+- 정치, 범죄, 사고만 제외
+- 나머지는 전부 포함
+- 각 뉴스마다 질문 형태로 변환
 
-JSON 배열로만 답변:
-[{"original_title":"","is_safe":true,"talk_topic":"","description":"","category":"entertain","situation":["company","friend"],"age_group":"all"}]`;
+예시:
+입력: "아이폰 17 출시"
+출력: {"is_safe":true,"talk_topic":"아이폰 17 나왔다는데 아세요?","description":"애플 신제품 출시","category":"tech"}
 
-      console.log(`[Batch ${i / batchSize + 1}] Sending...`);
-      
+이제 위 뉴스들을 JSON 배열로:
+[{"is_safe":true,"talk_topic":"...","description":"...","category":"entertain"}]`;
+
       const result = await model.generateContent(prompt);
       const text = result.response.text();
       
-      console.log(`[Batch ${i / batchSize + 1}] Received: ${text.length} chars`);
-      console.log(`[Batch ${i / batchSize + 1}] Preview: ${text.substring(0, 150)}`);
+      console.log(`[AI ${i / batchSize + 1}/${Math.ceil(Math.min(newsList.length, 30) / batchSize)}] Raw response:`, text.substring(0, 100));
 
-      // JSON 파싱 시도
-      let parsed: any[] = [];
+      // JSON 추출
+      let jsonStr = text.trim();
       
-      try {
-        // 1. 그대로 파싱
-        parsed = JSON.parse(text);
-      } catch {
-        try {
-          // 2. 코드블록 제거 후 파싱
-          const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-          parsed = JSON.parse(cleaned);
-        } catch {
-          try {
-            // 3. [ ] 사이만 추출
-            const match = text.match(/\[[\s\S]*\]/);
-            if (match) {
-              parsed = JSON.parse(match[0]);
-            }
-          } catch (e) {
-            console.error(`[Batch ${i / batchSize + 1}] All parsing failed`);
-            console.error('Text was:', text.substring(0, 300));
-            continue;
-          }
-        }
+      // 모든 마크다운 제거
+      jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      // [ ] 찾기
+      const match = jsonStr.match(/\[[\s\S]*\]/);
+      if (match) {
+        jsonStr = match[0];
       }
 
-      if (Array.isArray(parsed)) {
-        const validTopics = parsed.filter(t => {
-          return t.is_safe === true && 
-                 t.talk_topic && 
-                 t.description &&
-                 t.category;
-        });
+      try {
+        const parsed = JSON.parse(jsonStr);
         
-        allResults.push(...validTopics);
-        console.log(`[Batch ${i / batchSize + 1}] ✅ Added ${validTopics.length} topics`);
-      } else {
-        console.error(`[Batch ${i / batchSize + 1}] Not an array:`, typeof parsed);
+        if (Array.isArray(parsed)) {
+          // 각 항목 보완
+          const topics = parsed
+            .filter(t => t.is_safe === true)
+            .map((t, idx) => ({
+              original_title: batch[idx]?.title || t.talk_topic,
+              is_safe: true,
+              talk_topic: t.talk_topic || batch[idx]?.title,
+              description: t.description || batch[idx]?.description?.substring(0, 100) || '최근 화제',
+              conversation_tip: undefined,
+              category: t.category || 'life',
+              situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
+              age_group: 'all' as const,
+            }));
+          
+          allResults.push(...topics);
+          console.log(`[AI ${i / batchSize + 1}] ✅ ${topics.length}개 추가`);
+        }
+      } catch (parseError) {
+        console.error(`[AI ${i / batchSize + 1}] ❌ Parse failed`);
+        
+        // 파싱 실패 시 수동 변환
+        const manual = batch.map(n => ({
+          original_title: n.title,
+          is_safe: true,
+          talk_topic: `${n.title.substring(0, 30)}... 아세요?`,
+          description: n.description.substring(0, 100),
+          conversation_tip: undefined,
+          category: 'life' as const,
+          situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
+          age_group: 'all' as const,
+        }));
+        
+        allResults.push(...manual);
+        console.log(`[AI ${i / batchSize + 1}] ⚠️ Fallback: ${manual.length}개`);
       }
 
       // Rate limit
-      if (i + batchSize < Math.min(newsList.length, 25)) {
-        await new Promise(r => setTimeout(r, 2000));
+      if (i + batchSize < Math.min(newsList.length, 30)) {
+        await new Promise(r => setTimeout(r, 1500));
       }
 
     } catch (error: any) {
-      console.error(`[Batch ${i / batchSize + 1}] Error:`, error.message);
+      console.error(`[AI ${i / batchSize + 1}] Error:`, error.message);
+      
+      // 에러 시에도 수동 변환
+      const manual = batch.map(n => ({
+        original_title: n.title,
+        is_safe: true,
+        talk_topic: `${n.title.substring(0, 30)}... 아세요?`,
+        description: n.description.substring(0, 100),
+        conversation_tip: undefined,
+        category: 'life' as const,
+        situation: ['company', 'friend'] as ('company' | 'date' | 'friend')[],
+        age_group: 'all' as const,
+      }));
+      
+      allResults.push(...manual);
+      console.log(`[AI ${i / batchSize + 1}] 🔧 Error fallback: ${manual.length}개`);
     }
   }
 
-  console.log(`[AI Total] ${allResults.length} topics filtered`);
+  console.log(`[AI Total] ${allResults.length}개 필터링 완료`);
   return allResults;
 }
